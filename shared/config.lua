@@ -1,9 +1,6 @@
 Config = {}
-
--- Admin Groups wich will have Access --
 Config.AdminGroups = {
-    ['leitung'] = true,
-    ['user'] = false,
+    ['founder'] = { 'users', 'actions', 'visuals' },
 }
 
 -- Discord Webhooks for logging --
@@ -25,7 +22,7 @@ Config.Webhooks = {
 -- Aduty Options --
 Config.EnableESP = true
 Config.EnableSupportTag = true
-Config.ESPShowOnSelf = true -- Set to false to hide the ESP from your own character.
+Config.ESPShowOnSelf = true
 
 -- Users Tab --
 Config.PlayerActions = {
@@ -36,10 +33,20 @@ Config.PlayerActions = {
     armor = true,
     repairVehicle = true,
     toggleCombat = true,
+    food = true,
+    water = true,
+    tpTo = true,
+    tpHere = true,
 }
 
 -- Actions Tab --
 Config.Commands = {
+    noclip = {
+        enabled = true,
+        clientEvent = 'framework-support:client:toggleNoclip',
+        label = 'Noclip',
+        description = 'Toggles noclip, allowing you to fly through objects.'
+    },
     heal = {
         enabled = true,
         clientEvent = 'framework-support:client:healPlayer',
@@ -69,5 +76,23 @@ Config.Commands = {
         clientEvent = 'framework-support:client:toggleNoRagdoll',
         label = 'No Ragdoll',
         description = 'Toggles whether you can be ragdolled.'
+    },
+    invisibility = {
+        enabled = true,
+        clientEvent = 'framework-support:client:toggleInvisibility',
+        label = 'Invisibility',
+        description = 'Toggles your visibility.'
+    },
+    food = {
+        enabled = true,
+        clientEvent = 'framework-support:client:giveFood',
+        label = 'Food',
+        description = 'Fills your hunger.'
+    },
+    water = {
+        enabled = true,
+        clientEvent = 'framework-support:client:giveWater',
+        label = 'Water',
+        description = 'Fills your thirst.'
     }
 }

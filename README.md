@@ -2,29 +2,32 @@
 
 A comprehensive admin and support tool for FiveM servers, based on the ESX Framework. It provides an intuitive user interface created with `ox_lib` and allows authorized team members to perform a variety of actions on the server.
 
+> [!WARNING]
+> <span style="color:red;">**Performance Warning:** This resource is currently unoptimized and can have a significant impact on client-side performance. Resource monitor readings can reach up to **0.47ms**, especially when ESP features are active. An update to address this will be released soon.</span>
+
 ## ✨ Features
 
-- **Permission System:** Access control based on ESX groups.
+- **Granular Permission System:** Access control based on ESX groups. Define exactly which categories (`users`, `actions`, `visuals`) each group can access.
 - **Duty System:** Team members can go on or off duty. The duty status is made visible to all players (optional).
 - **Discord Logs:** Logging of important actions via Discord webhooks (duty status, player actions, self-actions).
-- **Player Interactions:**
-    - Kick
-    - Freeze / Unfreeze
-    - Revive
-    - Heal
-    - Give Armor
-    - Repair Vehicle
-    - Toggle Combat Mode (PvP)
-- **Self-Actions for Admins:**
-    - Heal
-    - Give Armor
-    - Revive
-    - Godmode
-    - No-Ragdoll
-- **ESP (Player Display):** Shows information about nearby players (optional).
+- **User Actions (Category: `users`):**
+    - **TP To:** Teleport to a player.
+    - **TP Here:** Teleport a player to you.
+    - **Kick, Freeze/Unfreeze, Revive, Heal, Give Armor.**
+    - **Repair Vehicle, Toggle Combat Mode (PvP).**
+    - **Give Food & Water.**
+- **Admin Actions (Category: `actions`):**
+    - **Noclip:** Advanced noclip with adjustable speed (Mouse Wheel) and sprint.
+    - **Self-Heal, Self-Armor, Self-Revive.**
+    - **Godmode, Invisibility, No-Ragdoll.**
+    - **Give self Food & Water.**
+- **Visuals (Category: `visuals`):**
+    - **ESP:** Toggle bounding boxes, health and armor bars.
+    - **ID:** Toggle player server IDs.
+    - **Nametag:** Toggle player names.
 - **User Interface:** Modern and user-friendly menu created with `ox_lib`.
 
-## 📦 Abhängigkeiten
+## 📦 Dependencies
 
 Make sure the following resources are installed on your server and started before `framework-support`:
 
@@ -45,7 +48,7 @@ Make sure the following resources are installed on your server and started befor
 5.  Configure `shared/config.lua` to your liking (see below).
 6.  Restart your server.
 
-## ⚙️ Konfiguration
+## ⚙️ Configuration
 
 All configuration is done in the `shared/config.lua` file.
 

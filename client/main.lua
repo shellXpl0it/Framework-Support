@@ -3,10 +3,28 @@ local onDutyPlayers = {}
 local toggleStates = {
     godmode = false,
     noragdoll = false,
+    invisibility = false,
+    noclip = false,
+    esp = false,
+    espId = false,
+    espNametag = false,
 }
 
+local noclipBaseSpeed = 3.0
+local noclipDisplaySpeed = 1
 
-RegisterNetEvent('framework-support:client:openMenu', function()
+
+local function hasAccess(categories, category)
+    if not categories then return false end
+    for _, cat in ipairs(categories) do
+        if cat == category then
+            return true
+        end
+    end
+    return false
+end
+
+RegisterNetEvent('framework-support:client:openMenu', function(allowedCategories)
     lib.notify({
         id = 'support_menu_opening',
         title = 'Framework Support',
@@ -14,23 +32,24 @@ RegisterNetEvent('framework-support:client:openMenu', function()
         type = 'inform',
         icon = 'shield-alt'
     })
-
     local menuOptions = {}
 
     if onAdminDuty then
-        table.insert(menuOptions, {
-            title = 'Users',
-            description = 'View online users.',
-            icon = 'users',
-            menu = 'support_submenu_users'
-        })
-
-        table.insert(menuOptions, {
-            title = 'Actions',
-            description = 'Execute admin actions.',
-            icon = 'terminal',
-            menu = 'support_submenu_actions'
-        })
+        if hasAccess(allowedCategories, 'users') then
+            table.insert(menuOptions, {
+                title = 'Users', description = 'View online users.', icon = 'users', menu = 'support_submenu_users'
+            })
+        end
+        if hasAccess(allowedCategories, 'actions') then
+            table.insert(menuOptions, {
+                title = 'Actions', description = 'Execute admin actions.', icon = 'terminal', menu = 'support_submenu_actions'
+            })
+        end
+        if hasAccess(allowedCategories, 'visuals') then
+            table.insert(menuOptions, {
+                title = 'Visuals', description = 'Change visual settings.', icon = 'eye', menu = 'support_submenu_visuals'
+            })
+        end
     end
 
     table.insert(menuOptions, {
@@ -58,10 +77,36 @@ RegisterNetEvent('framework-support:client:openMenu', function()
                     SetPedCanRagdoll(PlayerPedId(), true)
                     lib.notify({ title = 'Support No Ragdoll', description = 'No Ragdoll automatically disabled.', type = 'error' })
                 end
+                if toggleStates.invisibility then
+                    toggleStates.invisibility = false
+                    SetEntityVisible(PlayerPedId(), true, false)
+                    lib.notify({ title = 'Support Invisibility', description = 'Invisibility automatically disabled.', type = 'error' })
+                end
+                if toggleStates.noclip then
+                    toggleStates.noclip = false
+                    local ped = PlayerPedId()
+                    SetEntityVisible(ped, true, false)
+                    SetEntityCollision(ped, true, true)
+                    noclipBaseSpeed = 3.0
+                    noclipDisplaySpeed = 1
+                    lib.notify({ title = 'Support Noclip', description = 'Noclip automatically disabled.', type = 'error' })
+                end
+                if toggleStates.esp then
+                    toggleStates.esp = false
+                    lib.notify({ title = 'Support ESP', description = 'ESP automatically disabled.', type = 'error' })
+                end
+                if toggleStates.espId then
+                    toggleStates.espId = false
+                    lib.notify({ title = 'Support ESP ID', description = 'ESP ID automatically disabled.', type = 'error' })
+                end
+                if toggleStates.espNametag then
+                    toggleStates.espNametag = false
+                    lib.notify({ title = 'Support ESP Nametag', description = 'ESP Nametag automatically disabled.', type = 'error' })
+                end
             end
 
             lib.hideContext()
-            TriggerEvent('framework-support:client:openMenu')
+            TriggerServerEvent('framework-support:server:requestMenuOpen')
         end
     })
 
@@ -72,7 +117,14 @@ RegisterNetEvent('framework-support:client:openMenu', function()
     })
 
     local commandOptions = {}
-    for commandName, settings in pairs(Config.Commands) do
+    local commandOrder = {}
+    for name in pairs(Config.Commands) do
+        table.insert(commandOrder, name)
+    end
+    table.sort(commandOrder, function(a, b) return a == 'noclip' end)
+
+    for _, commandName in ipairs(commandOrder) do
+        local settings = Config.Commands[commandName]
         local isToggle = toggleStates[commandName] ~= nil
 
         table.insert(commandOptions, {
@@ -85,8 +137,6 @@ RegisterNetEvent('framework-support:client:openMenu', function()
                 return function()
                     if s.clientEvent then
                         TriggerServerEvent('framework-support:server:executeSelfAction', s.clientEvent, s.label)
-                        -- For non-toggle actions, show a generic notification
-                        -- Toggles have their own specific notifications
                         if not isToggle then
                             lib.notify({
                                 title = 'Action Executed',
@@ -107,6 +157,62 @@ RegisterNetEvent('framework-support:client:openMenu', function()
         title = 'Actions',
         menu = 'support_settings_menu',
         options = commandOptions
+    })
+
+    local visualsOptions = {}
+    table.insert(visualsOptions, {
+        title = 'ESP',
+        description = 'Toggles player ESP for yourself.',
+        icon = 'street-view',
+        checked = toggleStates.esp,
+        onSelect = function()
+            toggleStates.esp = not toggleStates.esp
+            lib.notify({
+                title = 'Support ESP',
+                description = toggleStates.esp and 'ESP has been enabled.' or 'ESP has been disabled.',
+                type = toggleStates.esp and 'success' or 'error'
+            })
+            lib.hideContext()
+            lib.showContext('support_submenu_visuals')
+        end
+    })
+    table.insert(visualsOptions, {
+        title = 'ID',
+        description = 'Toggles player ID display.',
+        icon = 'id-badge',
+        checked = toggleStates.espId,
+        onSelect = function()
+            toggleStates.espId = not toggleStates.espId
+            lib.notify({
+                title = 'Support ESP ID',
+                description = toggleStates.espId and 'ESP ID has been enabled.' or 'ESP ID has been disabled.',
+                type = toggleStates.espId and 'success' or 'error'
+            })
+            lib.hideContext()
+            lib.showContext('support_submenu_visuals')
+        end
+    })
+    table.insert(visualsOptions, {
+        title = 'Nametag',
+        description = 'Toggles player nametag display.',
+        icon = 'user-tag',
+        checked = toggleStates.espNametag,
+        onSelect = function()
+            toggleStates.espNametag = not toggleStates.espNametag
+            lib.notify({
+                title = 'Support ESP Nametag',
+                description = toggleStates.espNametag and 'Nametag has been enabled.' or 'Nametag has been disabled.',
+                type = toggleStates.espNametag and 'success' or 'error'
+            })
+            lib.hideContext()
+            lib.showContext('support_submenu_visuals')
+        end
+    })
+    lib.registerContext({
+        id = 'support_submenu_visuals',
+        title = 'Visuals',
+        menu = 'support_settings_menu',
+        options = visualsOptions
     })
 
     local userOptions = {}
@@ -138,6 +244,22 @@ RegisterNetEvent('framework-support:client:openMenu', function()
                         end
                         local playerActionOptions = {}
 
+                        if Config.PlayerActions.tpTo then
+                            table.insert(playerActionOptions, {
+                                title = 'TP To',
+                                description = 'Teleport yourself to this player.',
+                                icon = 'location-arrow',
+                                onSelect = function() TriggerServerEvent('framework-support:server:tpToPlayer', sId) end
+                            })
+                        end
+                        if Config.PlayerActions.tpHere then
+                            table.insert(playerActionOptions, {
+                                title = 'TP Here',
+                                description = 'Teleport this player to you.',
+                                icon = 'download',
+                                onSelect = function() TriggerServerEvent('framework-support:server:tpPlayerToMe', sId) end
+                            })
+                        end
                         if Config.PlayerActions.kick then
                             table.insert(playerActionOptions, {
                                 title = 'Kick Player',
@@ -194,6 +316,22 @@ RegisterNetEvent('framework-support:client:openMenu', function()
                                 onSelect = function() TriggerServerEvent('framework-support:server:toggleCombat', sId) end
                             })
                         end
+                        if Config.PlayerActions.food then
+                            table.insert(playerActionOptions, {
+                                title = 'Give Food',
+                                description = 'Fills this player\'s hunger.',
+                                icon = 'utensils',
+                                onSelect = function() TriggerServerEvent('framework-support:server:giveFoodToPlayer', sId) end
+                            })
+                        end
+                        if Config.PlayerActions.water then
+                            table.insert(playerActionOptions, {
+                                title = 'Give Water',
+                                description = 'Fills this player\'s thirst.',
+                                icon = 'tint',
+                                onSelect = function() TriggerServerEvent('framework-support:server:giveWaterToPlayer', sId) end
+                            })
+                        end
 
                         lib.registerContext({
                             id = 'support_player_actions_menu',
@@ -217,6 +355,9 @@ RegisterNetEvent('framework-support:client:openMenu', function()
 
     lib.showContext('support_settings_menu')
 
+end)
+RegisterNetEvent('framework-support:server:requestMenuOpen', function()
+    ExecuteCommand('fac')
 end)
 
 RegisterNetEvent('framework-support:client:showNoPermission', function()
@@ -285,6 +426,26 @@ RegisterNetEvent('framework-support:client:giveArmor', function()
     })
 end)
 
+RegisterNetEvent('framework-support:client:giveFood', function()
+    TriggerEvent('esx_status:set', 'hunger', 1000000)
+    lib.notify({
+        id = 'framework_fed',
+        title = 'Support Food',
+        description = 'You have been fed.',
+        type = 'success'
+    })
+end)
+
+RegisterNetEvent('framework-support:client:giveWater', function()
+    TriggerEvent('esx_status:set', 'thirst', 1000000)
+    lib.notify({
+        id = 'framework_watered',
+        title = 'Support Water',
+        description = 'Your thirst has been quenched.',
+        type = 'success'
+    })
+end)
+
 RegisterNetEvent('framework-support:client:revivePlayer', function()
     local ped = PlayerPedId()
     if IsPlayerDead(PlayerId()) then
@@ -322,6 +483,38 @@ RegisterNetEvent('framework-support:client:toggleNoRagdoll', function()
     })
 end)
 
+RegisterNetEvent('framework-support:client:toggleInvisibility', function()
+    toggleStates.invisibility = not toggleStates.invisibility
+    SetEntityVisible(PlayerPedId(), not toggleStates.invisibility, false)
+    lib.notify({
+        title = 'Support Invisibility',
+        description = toggleStates.invisibility and 'Invisibility has been enabled.' or 'Invisibility has been disabled.',
+        type = toggleStates.invisibility and 'success' or 'error'
+    })
+end)
+
+RegisterNetEvent('framework-support:client:toggleNoclip', function()
+    toggleStates.noclip = not toggleStates.noclip
+    local ped = PlayerPedId()
+    local isInVehicle = IsPedInAnyVehicle(ped, false)
+
+    if toggleStates.noclip then
+        SetEntityVisible(ped, false, false)
+        SetEntityCollision(ped, false, false)
+    else
+        SetEntityVisible(ped, true, false)
+        SetEntityCollision(ped, true, true)
+        noclipBaseSpeed = 3.0
+        noclipDisplaySpeed = 1
+    end
+
+    lib.notify({
+        title = 'Support Noclip',
+        description = toggleStates.noclip and 'Noclip has been enabled.' or 'Noclip has been disabled.',
+        type = toggleStates.noclip and 'success' or 'error'
+    })
+end)
+
 RegisterNetEvent('framework-support:client:setFreezeState', function(isFrozen)
     local ped = PlayerPedId()
     FreezeEntityPosition(ped, isFrozen)
@@ -345,8 +538,69 @@ RegisterNetEvent('framework-support:client:setCombatState', function(isDisabled)
     })
 end)
 
+RegisterNetEvent('framework-support:client:setCoords', function(coords)
+    local ped = PlayerPedId()
+    SetEntityCoords(ped, coords.x, coords.y, coords.z, false, false, false, true)
+end)
+
 CreateThread(function()
     while true do
+        if toggleStates.noclip then
+            local ped = PlayerPedId()
+            SetEntityVelocity(ped, 0.0, 0.0, 0.0)
+
+            if IsControlJustPressed(0, 14) then
+                noclipBaseSpeed = math.max(noclipBaseSpeed - 1.0, 1.0)
+                noclipDisplaySpeed = math.floor(noclipBaseSpeed)
+            elseif IsControlJustPressed(0, 15) then
+                noclipBaseSpeed = math.min(noclipBaseSpeed + 1.0, 10.0)
+                noclipDisplaySpeed = math.floor(noclipBaseSpeed)
+            end
+
+            local coords = GetEntityCoords(ped)
+            local camRot = GetGameplayCamRot(2)
+
+            local forwardVector = vector3(
+                -math.sin(math.rad(camRot.z)) * math.cos(math.rad(camRot.x)),
+                math.cos(math.rad(camRot.z)) * math.cos(math.rad(camRot.x)),
+                math.sin(math.rad(camRot.x))
+            )
+
+            local rightVector = vector3(
+                math.cos(math.rad(camRot.z)),
+                math.sin(math.rad(camRot.z)),
+                0
+            )
+
+            local upVector = vector3(0.0, 0.0, 1.0)
+
+            local currentMovementSpeed = noclipBaseSpeed * 0.5 
+            if IsControlPressed(0, 21) then
+                currentMovementSpeed = currentMovementSpeed * 4.0
+            end
+
+            if IsControlPressed(0, 32) then
+                coords = coords + forwardVector * currentMovementSpeed
+            end
+            if IsControlPressed(0, 33) then
+                coords = coords - forwardVector * currentMovementSpeed
+            end
+            if IsControlPressed(0, 34) then
+                coords = coords - rightVector * currentMovementSpeed
+            end
+            if IsControlPressed(0, 35) then
+                coords = coords + rightVector * currentMovementSpeed
+            end
+            if IsControlPressed(0, 38) then
+                coords = coords + upVector * currentMovementSpeed
+            end
+            if IsControlPressed(0, 44) then
+                coords = coords - upVector * currentMovementSpeed
+            end
+
+            SetEntityCoordsNoOffset(ped, coords.x, coords.y, coords.z, false, false, false)
+        end
+
         if isCombatDisabled then
             DisablePlayerFiring(PlayerId(), true)
             DisableControlAction(0, 24, true)
@@ -362,9 +616,29 @@ CreateThread(function()
     end
 end)
 
-RegisterNetEvent('framework-support:client:updateDutyStates', function(dutyList)
+CreateThread(function()
+    while true do
+        Wait(0)
+        if toggleStates.noclip then
+            local text = string.format("Noclip Speed: %d", noclipDisplaySpeed)
+            SetTextFont(4)
+            SetTextScale(0.0, 0.4)
+            SetTextColour(255, 255, 255, 255)
+            SetTextDropshadow(0, 0, 0, 0, 255)
+            SetTextEdge(1, 0, 0, 0, 255)
+            SetTextRightJustify(true)
+            SetTextWrap(0.0, 1.0)
+            SetTextEntry("STRING")
+            AddTextComponentString(text)
+            DrawText(0.95, 0.02)
+        end
+    end
+end)
+
+RegisterNetEvent('framework-support:client:updateDutyStates', function(dutyList) 
     onDutyPlayers = dutyList
 end)
+
 
 local function Draw3DText(x, y, z, text)
     local onScreen, _x, _y = World3dToScreen2d(x, y, z)
@@ -399,8 +673,10 @@ CreateThread(function()
                 local playerClientId = GetPlayerFromServerId(tonumber(playerServerId))
                 if playerClientId ~= -1 and NetworkIsPlayerActive(playerClientId) then
                     local targetPed = GetPlayerPed(playerClientId)
-                    local coords = GetEntityCoords(targetPed)
-                    Draw3DText(coords.x, coords.y, coords.z + 1.0, 'Support')
+                    if IsEntityVisible(targetPed) then
+                        local coords = GetEntityCoords(targetPed)
+                        Draw3DText(coords.x, coords.y, coords.z + 1.0, 'Support')
+                    end
                 end
             end
         end
@@ -411,7 +687,7 @@ CreateThread(function()
     while true do        
         Wait(0)
 
-        if onAdminDuty and Config.EnableESP then
+        if onAdminDuty and (toggleStates.esp or toggleStates.espId or toggleStates.espNametag) then
             for i = 0, 255 do
                 if NetworkIsPlayerActive(i) and (Config.ESPShowOnSelf or GetPlayerPed(i) ~= PlayerPedId()) then
                     local ped = GetPlayerPed(i)
@@ -425,51 +701,66 @@ CreateThread(function()
                     local feetOnScreen, feetScreenX, feetScreenY = World3dToScreen2d(feetPos.x, feetPos.y, feetPos.z)
 
                     if headOnScreen and feetOnScreen then
-                        local height = feetScreenY - headScreenY
-                        local width = height * 0.3
+                        if toggleStates.esp then
+                            local height = feetScreenY - headScreenY
+                            local width = height * 0.3
 
-                        local boxCenter = (headScreenX + feetScreenX) / 2
-                        local boxLeft = boxCenter - width / 2
-                        local boxTop = headScreenY
+                            local boxCenter = (headScreenX + feetScreenX) / 2
+                            local boxLeft = boxCenter - width / 2
+                            local boxTop = headScreenY
 
-                        local health = GetEntityHealth(ped)
-                        local maxHealth = GetEntityMaxHealth(ped)
-                        local healthPercent = health / maxHealth
-                        local armor = GetPedArmour(ped)
-                        local armorPercent = armor / 100
+                            local health = GetEntityHealth(ped)
+                            local maxHealth = GetEntityMaxHealth(ped)
+                            local healthPercent = health / maxHealth
+                            local armor = GetPedArmour(ped)
+                            local armorPercent = armor / 100
 
-                        local healthBarX = boxLeft - 0.006
-                        DrawRect(healthBarX, boxTop + height / 2, 0.006, height + 0.002, 0, 0, 0, 200) -- Outline
-                        DrawRect(healthBarX, boxTop + height / 2, 0.004, height, 50, 50, 50, 150) -- Background
-                        DrawRect(healthBarX, boxTop + height - (height * healthPercent / 2), 0.004, height * healthPercent, 76, 175, 80, 255) -- Fill
+                            local healthBarX = boxLeft - 0.006
+                            DrawRect(healthBarX, boxTop + height / 2, 0.006, height + 0.002, 0, 0, 0, 200)
+                            DrawRect(healthBarX, boxTop + height / 2, 0.004, height, 50, 50, 50, 150)
+                            DrawRect(healthBarX, boxTop + height - (height * healthPercent / 2), 0.004, height * healthPercent, 76, 175, 80, 255)
 
-                        if armor > 0 then
-                            local armorBarX = boxLeft - 0.013
-                            DrawRect(armorBarX, boxTop + height / 2, 0.006, height + 0.002, 0, 0, 0, 200) -- Outline
-                            DrawRect(armorBarX, boxTop + height / 2, 0.004, height, 50, 50, 50, 150) -- Background
-                            DrawRect(armorBarX, boxTop + height - (height * armorPercent / 2), 0.004, height * armorPercent, 3, 169, 244, 255) -- Fill
+                            if armor > 0 then
+                                local armorBarX = boxLeft - 0.013
+                                DrawRect(armorBarX, boxTop + height / 2, 0.006, height + 0.002, 0, 0, 0, 200)
+                                DrawRect(armorBarX, boxTop + height / 2, 0.004, height, 50, 50, 50, 150)
+                                DrawRect(armorBarX, boxTop + height - (height * armorPercent / 2), 0.004, height * armorPercent, 3, 169, 244, 255)
+                            end
+
+                            DrawRect(boxCenter, boxTop, width + 0.002, 0.003, 0,0,0,200)
+                            DrawRect(boxCenter, boxTop + height, width + 0.002, 0.003, 0,0,0,200)
+                            DrawRect(boxLeft, boxTop + height / 2, 0.003, height, 0,0,0,200)
+                            DrawRect(boxLeft + width, boxTop + height / 2, 0.003, height, 0,0,0,200)
+
+                            DrawRect(boxCenter, boxTop, width, 0.001, 255, 255, 255, 255)
+                            DrawRect(boxCenter, boxTop + height, width, 0.001, 255, 255, 255, 255)
+                            DrawRect(boxLeft, boxTop + height / 2, 0.001, height, 255, 255, 255, 255)
+                            DrawRect(boxLeft + width, boxTop + height / 2, 0.001, height, 255, 255, 255, 255)
                         end
 
-                        DrawRect(boxCenter, boxTop, width + 0.002, 0.003, 0,0,0,200) -- Top Outline
-                        DrawRect(boxCenter, boxTop + height, width + 0.002, 0.003, 0,0,0,200) -- Bottom Outline
-                        DrawRect(boxLeft, boxTop + height / 2, 0.003, height, 0,0,0,200) -- Left Outline
-                        DrawRect(boxLeft + width, boxTop + height / 2, 0.003, height, 0,0,0,200) -- Right Outline
+                        if toggleStates.espNametag or toggleStates.espId then
+                            local textParts = {}
+                            if toggleStates.espNametag then
+                                table.insert(textParts, GetPlayerName(i))
+                            end
+                            if toggleStates.espId then
+                                table.insert(textParts, string.format('[%s]', GetPlayerServerId(i)))
+                            end
+                            local text = table.concat(textParts, ' ')
 
-                        DrawRect(boxCenter, boxTop, width, 0.001, 255, 255, 255, 255) -- Top
-                        DrawRect(boxCenter, boxTop + height, width, 0.001, 255, 255, 255, 255) -- Bottom
-                        DrawRect(boxLeft, boxTop + height / 2, 0.001, height, 255, 255, 255, 255) -- Left
-                        DrawRect(boxLeft + width, boxTop + height / 2, 0.001, height, 255, 255, 255, 255) -- Right
+                            local boxCenter = (headScreenX + feetScreenX) / 2
+                            local boxTop = headScreenY
 
-                        local text = string.format('%s [%s]', GetPlayerName(i), GetPlayerServerId(i))
-                        SetTextFont(4)
-                        SetTextScale(0.0, 0.4)
-                        SetTextColour(255, 255, 255, 255)
-                        SetTextDropshadow(0, 0, 0, 0, 255)
-                        SetTextEdge(1, 0, 0, 0, 255)
-                        SetTextCentre(true)
-                        SetTextEntry("STRING")
-                        AddTextComponentString(text)
-                        DrawText(boxCenter, boxTop - 0.025)
+                            SetTextFont(4)
+                            SetTextScale(0.0, 0.4)
+                            SetTextColour(255, 255, 255, 255)
+                            SetTextDropshadow(0, 0, 0, 0, 255)
+                            SetTextEdge(1, 0, 0, 0, 255)
+                            SetTextCentre(true)
+                            SetTextEntry("STRING")
+                            AddTextComponentString(text)
+                            DrawText(boxCenter, boxTop - 0.025)
+                        end
                     end
                 end
             end

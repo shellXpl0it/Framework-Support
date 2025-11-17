@@ -16,7 +16,6 @@ AddEventHandler('playerDropped', function(reason)
     end
 end)
 
--- Helper function to get detailed player information for embeds
 local function getPlayerInfo(xPlayer)
     if not xPlayer then return "Unknown Player" end
     local identifier = xPlayer.getIdentifier() or "N/A"
@@ -47,22 +46,20 @@ local function sendToDiscord(webhookUrl, embed)
 end
 
 RegisterCommand('fac', function(source, args, rawCommand)
-    local player = source
-
-    local xPlayer = ESX.GetPlayerFromId(player)
-
+    local xPlayer = ESX.GetPlayerFromId(source)
     if not xPlayer then return end
 
     local group = xPlayer.getGroup()
-
     if not group then 
-        return print('^1[Support ERROR]^7: Could not get player group for source: ' .. player)
+        return print('^1[Support ERROR]^7: Could not get player group for source: ' .. source)
     end
 
-    if Config.AdminGroups[group] then
-        TriggerClientEvent('framework-support:client:openMenu', player)
+    local allowedCategories = Config.AdminGroups[group]
+
+    if allowedCategories then
+        TriggerClientEvent('framework-support:client:openMenu', source, allowedCategories)
     else
-        TriggerClientEvent('framework-support:client:showNoPermission', player)
+        TriggerClientEvent('framework-support:client:showNoPermission', source)
     end
 end, false)
 
@@ -76,7 +73,7 @@ RegisterNetEvent('framework-support:server:setDutyState', function(isOnDuty)
         print(('[Support]: Player ID %s has gone ON duty.'):format(source))
         local embed = {
             author = { name = "Duty Status Changed" },
-            color = 65280, -- Green
+            color = 65280,
             fields = {
                 { name = "👮 Admin", value = getPlayerInfo(xPlayer), inline = false },
                 { name = "Status", value = "**ON DUTY**", inline = false }
@@ -92,7 +89,7 @@ RegisterNetEvent('framework-support:server:setDutyState', function(isOnDuty)
         print(('[Support]: Player ID %s has gone OFF duty.'):format(source))
         local embed = {
             author = { name = "Duty Status Changed" },
-            color = 16711680, -- Red
+            color = 16711680,
             fields = {
                 { name = "👮 Admin", value = getPlayerInfo(xPlayer), inline = false },
                 { name = "Status", value = "**OFF DUTY**", inline = false }
@@ -108,23 +105,26 @@ RegisterNetEvent('framework-support:server:setDutyState', function(isOnDuty)
     TriggerClientEvent('framework-support:client:updateDutyStates', -1, onDutyAdmins)
 end)
 
-RegisterNetEvent('framework-support:server:executeSelfAction', function(clientEvent, actionLabel)
+RegisterNetEvent('framework-support:server:executeSelfAction', function(clientEvent, actionLabel, extraData)
     local source = source
     local xPlayer = ESX.GetPlayerFromId(source)
     if not xPlayer then return end
 
     if Config.AdminGroups[xPlayer.getGroup()] then
-        TriggerClientEvent(clientEvent, source)
+        TriggerClientEvent(clientEvent, source, extraData)
         local embed = {
             author = { name = "Self-Action Executed" },
-            color = 3447003, -- Blue
+            color = 3447003,
             fields = {
                 { name = "👮 Admin", value = getPlayerInfo(xPlayer), inline = true },
-                { name = "⚡ Action", value = string.format("**%s**", actionLabel), inline = true }
+                { name = "⚡ Action", value = string.format("**%s**", actionLabel), inline = true },
             },
             footer = { text = "Framework Support" },
             timestamp = os.date("!%Y-%m-%dT%H:%M:%S.000Z")
         }
+        if extraData then
+            table.insert(embed.fields, { name = "📝 Details", value = extraData, inline = false })
+        end
         if Config.Webhooks.selfActions.enabled then
             sendToDiscord(Config.Webhooks.selfActions.url, embed)
         end
@@ -154,11 +154,61 @@ RegisterNetEvent('framework-support:server:toggleCombat', function(targetId)
     print(('[Support]: Player %s (ID: %s) %s combat for player %s (ID: %s).'):format(adminPlayer.getName(), source, combatDisabledPlayers[targetId] and 'disabled' or 'enabled', targetPlayer.getName(), targetId))
     local embed = {
         author = { name = "Player Action: Toggle Combat" },
-        color = 15105570, -- Orange
+        color = 15105570,
         fields = {
             { name = "👮 Admin", value = getPlayerInfo(adminPlayer), inline = true },
             { name = "🎯 Target", value = getPlayerInfo(targetPlayer), inline = true },
             { name = "Status", value = combatDisabledPlayers[targetId] and '**Disabled**' or '**Enabled**', inline = false }
+        },
+        footer = { text = "Framework Support" },
+        timestamp = os.date("!%Y-%m-%dT%H:%M:%S.000Z")
+    }
+    if Config.Webhooks.userActions.enabled then
+        sendToDiscord(Config.Webhooks.userActions.url, embed)
+    end
+end)
+
+RegisterNetEvent('framework-support:server:tpToPlayer', function(targetId)
+    local source = source
+    local adminPlayer = ESX.GetPlayerFromId(source)
+    if not Config.AdminGroups[adminPlayer.getGroup()] then return end
+    local targetPlayer = ESX.GetPlayerFromId(targetId)
+    if not targetPlayer then return end
+
+    local targetCoords = targetPlayer.getCoords()
+    TriggerClientEvent('framework-support:client:setCoords', source, targetCoords)
+
+    local embed = {
+        author = { name = "Player Action: Teleport To" },
+        color = 9807270,
+        fields = {
+            { name = "👮 Admin", value = getPlayerInfo(adminPlayer), inline = true },
+            { name = "🎯 Target", value = getPlayerInfo(targetPlayer), inline = true }
+        },
+        footer = { text = "Framework Support" },
+        timestamp = os.date("!%Y-%m-%dT%H:%M:%S.000Z")
+    }
+    if Config.Webhooks.userActions.enabled then
+        sendToDiscord(Config.Webhooks.userActions.url, embed)
+    end
+end)
+
+RegisterNetEvent('framework-support:server:tpPlayerToMe', function(targetId)
+    local source = source
+    local adminPlayer = ESX.GetPlayerFromId(source)
+    if not Config.AdminGroups[adminPlayer.getGroup()] then return end
+    local targetPlayer = ESX.GetPlayerFromId(targetId)
+    if not targetPlayer then return end
+
+    local adminCoords = adminPlayer.getCoords()
+    TriggerClientEvent('framework-support:client:setCoords', targetId, adminCoords)
+
+    local embed = {
+        author = { name = "Player Action: Teleport Here" },
+        color = 9807270,
+        fields = {
+            { name = "👮 Admin", value = getPlayerInfo(adminPlayer), inline = true },
+            { name = "🎯 Target", value = getPlayerInfo(targetPlayer), inline = true }
         },
         footer = { text = "Framework Support" },
         timestamp = os.date("!%Y-%m-%dT%H:%M:%S.000Z")
@@ -184,7 +234,7 @@ RegisterNetEvent('framework-support:server:toggleFreeze', function(targetId)
     TriggerClientEvent('framework-support:client:setFreezeState', targetId, frozenPlayers[targetId])
     local embed = {
         author = { name = "Player Action: Toggle Freeze" },
-        color = 15105570, -- Orange
+        color = 15105570,
         fields = {
             { name = "👮 Admin", value = getPlayerInfo(adminPlayer), inline = true },
             { name = "🎯 Target", value = getPlayerInfo(targetPlayer), inline = true },
@@ -213,7 +263,7 @@ RegisterNetEvent('framework-support:server:revivePlayer', function(targetId)
     print(('[Support]: Player %s (ID: %s) revived player %s (ID: %s).'):format(adminPlayer.getName(), source, targetPlayer.getName(), targetId))
     local embed = {
         author = { name = "Player Action: Revive" },
-        color = 3066993, -- Green
+        color = 3066993,
         fields = {
             { name = "👮 Admin", value = getPlayerInfo(adminPlayer), inline = true },
             { name = "🎯 Target", value = getPlayerInfo(targetPlayer), inline = true }
@@ -234,7 +284,7 @@ RegisterNetEvent('framework-support:server:healPlayer', function(targetId)
     TriggerClientEvent('framework-support:client:healPlayer', targetId)
     local embed = {
         author = { name = "Player Action: Heal" },
-        color = 3066993, -- Green
+        color = 3066993,
         fields = {
             { name = "👮 Admin", value = getPlayerInfo(adminPlayer), inline = true },
             { name = "🎯 Target", value = getPlayerInfo(targetPlayer), inline = true }
@@ -255,7 +305,7 @@ RegisterNetEvent('framework-support:server:armorPlayer', function(targetId)
     TriggerClientEvent('framework-support:client:giveArmor', targetId)
     local embed = {
         author = { name = "Player Action: Armor" },
-        color = 3447003, -- Blue
+        color = 3447003,
         fields = {
             { name = "👮 Admin", value = getPlayerInfo(adminPlayer), inline = true },
             { name = "🎯 Target", value = getPlayerInfo(targetPlayer), inline = true }
@@ -276,7 +326,7 @@ RegisterNetEvent('framework-support:server:repairVehicleForPlayer', function(tar
     TriggerClientEvent('framework-support:client:repairVehicle', targetId)
     local embed = {
         author = { name = "Player Action: Repair Vehicle" },
-        color = 10181046, -- Gray
+        color = 10181046,
         fields = {
             { name = "👮 Admin", value = getPlayerInfo(adminPlayer), inline = true },
             { name = "🎯 Target", value = getPlayerInfo(targetPlayer), inline = true }
@@ -323,11 +373,53 @@ RegisterNetEvent('framework-support:server:kickPlayer', function(targetId, reaso
     print(('[Support]: Player %s (ID: %s) kicked player %s (ID: %s).'):format(adminPlayer.getName(), source, targetPlayer.getName(), targetId))
     local embed = {
         author = { name = "Player Action: Kick" },
-        color = 15158332, -- Red
+        color = 15158332,
         fields = {
             { name = "👮 Admin", value = getPlayerInfo(adminPlayer), inline = true },
             { name = "🎯 Target", value = getPlayerInfo(targetPlayer), inline = true },
             { name = "📝 Reason", value = finalReason, inline = false }
+        },
+        footer = { text = "Framework Support" },
+        timestamp = os.date("!%Y-%m-%dT%H:%M:%S.000Z")
+    }
+    if Config.Webhooks.userActions.enabled then
+        sendToDiscord(Config.Webhooks.userActions.url, embed)
+    end
+end)
+
+RegisterNetEvent('framework-support:server:giveFoodToPlayer', function(targetId)
+    local source = source
+    local adminPlayer = ESX.GetPlayerFromId(source)
+    if not Config.AdminGroups[adminPlayer.getGroup()] then return end
+    local targetPlayer = ESX.GetPlayerFromId(targetId)
+    TriggerClientEvent('framework-support:client:giveFood', targetId)
+    local embed = {
+        author = { name = "Player Action: Give Food" },
+        color = 12749472,
+        fields = {
+            { name = "👮 Admin", value = getPlayerInfo(adminPlayer), inline = true },
+            { name = "🎯 Target", value = getPlayerInfo(targetPlayer), inline = true }
+        },
+        footer = { text = "Framework Support" },
+        timestamp = os.date("!%Y-%m-%dT%H:%M:%S.000Z")
+    }
+    if Config.Webhooks.userActions.enabled then
+        sendToDiscord(Config.Webhooks.userActions.url, embed)
+    end
+end)
+
+RegisterNetEvent('framework-support:server:giveWaterToPlayer', function(targetId)
+    local source = source
+    local adminPlayer = ESX.GetPlayerFromId(source)
+    if not Config.AdminGroups[adminPlayer.getGroup()] then return end
+    local targetPlayer = ESX.GetPlayerFromId(targetId)
+    TriggerClientEvent('framework-support:client:giveWater', targetId)
+    local embed = {
+        author = { name = "Player Action: Give Water" },
+        color = 3447003,
+        fields = {
+            { name = "👮 Admin", value = getPlayerInfo(adminPlayer), inline = true },
+            { name = "🎯 Target", value = getPlayerInfo(targetPlayer), inline = true }
         },
         footer = { text = "Framework Support" },
         timestamp = os.date("!%Y-%m-%dT%H:%M:%S.000Z")
