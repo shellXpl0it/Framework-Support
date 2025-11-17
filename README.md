@@ -1,4 +1,4 @@
-# Framework Support - Admin & Support Tool
+# Fivem Framework Support - Admin & Support Tool
 
 A comprehensive admin and support tool for FiveM servers, based on the ESX Framework. It provides an intuitive user interface created with `ox_lib` and allows authorized team members to perform a variety of actions on the server.
 
